@@ -1,0 +1,69 @@
+# =============================================================================
+#  .gitignore — renewal-model
+#  Modelo bayesiano de renovación COVID-19 · Bogotá
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stan: binarios compilados (se regeneran con cmdstanr al correr los scripts)
+# ---------------------------------------------------------------------------
+*.exe
+*.o
+*.hpp
+
+# ---------------------------------------------------------------------------
+# R: objetos de entorno (nunca commitear — contienen rutas absolutas locales)
+# ---------------------------------------------------------------------------
+.RData
+.RDataTmp
+.Rhistory
+.Rproj.user/
+
+# ---------------------------------------------------------------------------
+# Fits MCMC (.rds) — archivos grandes, se regeneran corriendo los scripts
+# Excepciones: si quieres versionar fits livianos, quita el # de la línea
+# ---------------------------------------------------------------------------
+fit_*.rds
+draws_*.rds
+
+# ---------------------------------------------------------------------------
+# Figuras generadas (outputs reproducibles)
+# ---------------------------------------------------------------------------
+*.pdf
+*.png
+
+# ---------------------------------------------------------------------------
+# Tablas y CSVs intermedios generados por los scripts
+# ---------------------------------------------------------------------------
+diagnosticos_convergencia*.csv
+loo_comparison*.csv
+loo_fase2*.csv
+sensibilidad_IS*.csv
+posterior_params*.csv
+posterior_modelo_definitivo.csv
+tabla_resumen*.csv
+tabla_convergencia*.csv
+residuales.csv
+lrt_resultado.csv
+detalles_numericos.csv
+diagnostico_sobredispersion.csv
+
+# ---------------------------------------------------------------------------
+# Archivos de sistema y editores
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Carpetas de iteraciones anteriores (no forman parte del repo final)
+# ---------------------------------------------------------------------------
+MODELO_STAN_1/
+MODELO_STAN2/
+MODELO_STAN3/
+MODELO_STAN_3/
+
+# ---------------------------------------------------------------------------
+# Nota: datos_agregados.xlsx SÍ se versiona (fuente primaria, <1 MB)
+# ---------------------------------------------------------------------------
