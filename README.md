@@ -99,6 +99,10 @@ source("MODELO_STAN_4/grafica_estacionariedad.R")
 
 ### Paso 1 — Fase 1: Análisis preliminar de convergencia
 
+> **Tiempo estimado: 4–5 horas.** Se ajustan 10 modelos en secuencia,
+> cada uno con 4 cadenas paralelas × (1000 warmup + 1000 sampling).
+> **Se recomienda correr overnight.**
+
 Ajusta **10 modelos** AR(2)+Gamma con 5 especificaciones del intervalo serial (IS):
 
 | IS | Fuente |
@@ -110,10 +114,10 @@ Ajusta **10 modelos** AR(2)+Gamma con 5 especificaciones del intervalo serial (I
 | Colombia | Datos Colombia |
 
 ```r
-# 1a. Ajustar los 10 modelos (≈ 30-60 min con 4 cadenas paralelas)
+# 1a. Ajustar los 10 modelos — correr overnight (≈ 4-5 h)
 source("MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR/analisis_bogota_ar2_gamma.R")
 
-# 1b. Comparación LOO y análisis de sensibilidad al IS
+# 1b. Comparación LOO y análisis de sensibilidad al IS (< 1 min)
 source("MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR/metricas_loo_sensibilidad_AR.R")
 ```
 
@@ -124,6 +128,10 @@ source("MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR/metricas_loo_sensibilida
 - `fig1_traceplots_gamma.pdf` … `fig6_posterior_params_gamma.pdf` — figuras diagnósticas
 
 ### Paso 2 — Fase 2: Modelo definitivo y análisis de sensibilidad
+
+> **Tiempo estimado: 30–45 minutos.** Se ajusta 1 modelo definitivo AR(1)
+> con 4 cadenas × (1500 warmup + 1500 sampling), más 2 modelos de
+> sensibilidad con la misma configuración del Paso 1.
 
 Compara AR(1) vs AR(2) y prior Gamma vs Exponencial para el exógeno.
 Usa el IS de referencia (Bi et al. 2020) en todos los modelos.
