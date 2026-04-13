@@ -44,7 +44,7 @@ renewal-model/
 
 ## Datos
 
-**Archivo:** `MODELO_STAN_4/datos_agregados.xlsx`
+**Archivo:** `data/datos_agregados.xlsx`
 
 | Hoja | Contenido |
 |------|-----------|
@@ -107,11 +107,11 @@ Ajusta **10 modelos** AR(2)+Gamma con 5 especificaciones del intervalo serial (I
 
 | IS | Fuente |
 |----|--------|
-| Referencia | Bi et al. (2020) vía Mishra et al. (2020) — **IS final** |
-| Burkina | Datos locales |
-| China gamma | Li et al. (2020) — parámetros gamma |
-| China normal | Li et al. (2020) — parámetros normales |
-| Colombia | Datos Colombia |
+| Referencia | Bi et al. (2020) vía Mishra et al. (2020) — **IS seleccionado** |
+| Burkina Faso | Somda et al. (2022) |
+| China gamma | Li et al. (2020) — parametrización Gamma |
+| China normal | Li et al. (2020) — parametrización Normal |
+| Colombia | Estrada-Álvarez et al. (2020) |
 
 ```r
 # 1a. Ajustar los 10 modelos — correr overnight (≈ 4-5 h)
@@ -137,7 +137,7 @@ Compara AR(1) vs AR(2) y prior Gamma vs Exponencial para el exógeno.
 Usa el IS de referencia (Bi et al. 2020) en todos los modelos.
 
 ```r
-# 2a. Ajustar modelos de sensibilidad y modelo definitivo (≈ 20-40 min)
+# 2a. Ajustar modelos de sensibilidad y modelo definitivo (≈ 30-45 min)
 source("MODELO_STAN_DEFINITIVO/analisis_fase2_definitivo.R")
 
 # 2b. Figura del componente exógeno (requiere fit del paso 2a)
@@ -156,13 +156,16 @@ source("MODELO_STAN_DEFINITIVO/figura_exogeno.R")
 
 ## Intervalos seriales usados
 
-| Nombre | Distribución | Media (días) | Fuente |
-|--------|-------------|--------------|--------|
-| **Referencia** | Gamma(μ=4.7, σ=2.9) | 4.7 | Bi et al. (2020) vía Mishra et al. (2020) |
-| Burkina | Empírico | — | Datos locales |
-| China gamma | Gamma | — | Li et al. (2020) |
-| China normal | Normal | — | Li et al. (2020) |
-| Colombia | Empírico | — | Datos Colombia |
+| Nombre | Distribución | Parámetros | Media (días) | Fuente |
+|--------|-------------|------------|--------------|--------|
+| **Referencia** | Gamma | shape=6.5, rate=0.62 | 10.5 | Bi et al. (2020) vía Mishra et al. (2020) |
+| China gamma | Gamma | shape=2.29, rate=0.36 | 6.4 | Li et al. (2020) |
+| China normal | Normal truncada en 0 | μ=5.0, σ=5.2 | ~5.0 | Li et al. (2020) |
+| Burkina Faso | Gamma | shape=1.04, rate=0.18 | 5.8 | Somda et al. (2022) |
+| Colombia | Gamma | shape=1.96, rate=0.51 | 3.8 | Estrada-Álvarez et al. (2020) |
+
+> Todos los intervalos seriales se discretizan mediante integración numérica
+> antes de pasarlos a Stan como vector fijo `SI[N]` (longitud máxima = 30 días).
 
 ---
 
@@ -171,36 +174,58 @@ source("MODELO_STAN_DEFINITIVO/figura_exogeno.R")
 El número de casos en el día t sigue:
 
 ```
-y_t ~ NB-2(μ_t, φ)
+y(t) ~ NB-2(f(t), φ)
 
-μ_t = R_t · Σ_{s=1}^{t-1} y_{t-s} · w_s  +  λ_t
+f(t) = μ(t) + R_t · Σ_{s=1}^{t-1} y(s) · g(t-s)
 
-log R_t = α · log R_{t-1} + ε_t,    ε_t ~ Normal(0, σ²)   [AR(1)]
+log R_t = μ_R + ρ₁ · (log R_{t-1} − μ_R) + ε_t,   ε_t ~ N(0, σ_ε²)   [AR(1)]
 
-λ_t ~ Gamma(α_λ, β_λ)   [exógeno: casos importados]
+μ(t) ~ Gamma(1.401, 0.168)   [exógeno: casos importados, activo días 1-12]
 ```
 
-donde `w_s` es el intervalo serial discretizado y `φ` es el parámetro de
-sobredispersión de la NB-2.
+donde `g(s)` es el intervalo serial discretizado y `φ` es el parámetro de
+sobredispersión de la NB-2. El componente exógeno `μ(t)` modela los casos
+importados durante el período pre-cuarentena (14–25 marzo 2020) y está
+calibrado por método de momentos sobre los datos observados
+(media = 8.33 casos/día, varianza = 49.52).
 
-**Priors:**
-- `α ~ Uniform(-1, 1)` (estacionariedad AR)
-- `σ ~ HalfNormal(0, 0.5)`
-- `R_1 ~ LogNormal(log(2.5), 0.5)`
-- `φ ~ HalfNormal(0, 10)`
+**Priors del modelo definitivo:**
+
+| Parámetro | Prior | Interpretación |
+|-----------|-------|----------------|
+| `μ_R` | N(0, 0.3) | Media de largo plazo de log(R_t); centrado en R_t ≈ 1 |
+| `ρ₁` | N(0.7, 0.15) truncado en [0,1] | Autocorrelación diaria de log(R_t) |
+| `σ_ε` | N⁺(0, 0.2) | Desviación estándar de innovaciones diarias |
+| `φ` | N⁺(0, 5) | Sobredispersión NB-2 |
+
+**Resultados posteriores del modelo definitivo:**
+
+| Parámetro | Media | IC 95% |
+|-----------|-------|--------|
+| μ_R | 0.203 | [−0.258, 0.552] |
+| ρ₁ | 0.962 | [0.870, 0.997] |
+| σ_ε | 0.099 | [0.047, 0.180] |
+| φ | 3.263 | [2.609, 4.015] |
+
+**Diagnósticos MCMC:**
+
+| Métrica | Valor |
+|---------|-------|
+| R̂ máximo | 1.0036 |
+| ESS mínimo | 1,718 |
+| Divergencias | 120 / 6,000 (2.0%) |
+| Treedepth saturadas | 0 (0.0%) |
 
 ---
 
 ## Ajuste de rutas antes de correr
 
 Los scripts usan rutas absolutas. Antes de ejecutar, editar en cada script la
-sección `SECCIÓN 1: CONFIGURACIÓN`:
+variable `RUTA_BASE` al inicio del archivo:
 
 ```r
-# En 01_analisis_bogota_ar2_gamma.R y 01_analisis_fase2_definitivo.R:
-RUTA_DATOS  <- "<tu_ruta>/data/datos_agregados.xlsx"
-RUTA_STAN   <- "<tu_ruta>/MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR"
-# etc.
+# Reemplazar con la ruta local al repositorio clonado:
+RUTA_BASE <- "C:/tu_ruta/renewal-model"
 ```
 
 ---
@@ -220,13 +245,24 @@ RUTA_STAN   <- "<tu_ruta>/MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR"
 ## Referencias
 
 - Bi Q, et al. (2020). Epidemiology and transmission of COVID-19 in 391 cases and 1286 of their close contacts in Shenzhen, China. *Lancet Infect Dis*, 20(8), 911–919.
-- Mishra S, et al. (2020). A COVID-19 Model for Local Authorities of the United Kingdom. *Imperial College London*, Report 33.
+- Estrada-Álvarez JM, et al. (2020). Estimación del intervalo serial y número reproductivo básico para los casos importados de COVID-19. *Rev Salud Pública*, 22(2). https://doi.org/10.15446/rsap.v22n2.87492
 - Li Q, et al. (2020). Early Transmission Dynamics in Wuhan, China, of Novel Coronavirus–Infected Pneumonia. *NEJM*, 382(13), 1199–1207.
+- Mishra S, et al. (2020). A COVID-19 Model for Local Authorities of the United Kingdom. *Imperial College London*, arXiv:2006.16487.
+- Somda ZC, et al. (2022). Serial interval of COVID-19 in Burkina Faso. *[fuente por completar]*.
 - Stan Development Team (2024). *Stan Modeling Language Users Guide and Reference Manual*.
-- Gabry J, et al. (2024). *cmdstanr: R Interface to CmdStan*.
+
+---
+
+## Datos
+
+Los datos (`data/datos_agregados.xlsx`) están incluidos en el repositorio.
+Fuente: Sistema de Vigilancia en Salud Pública del Distrito Capital de Bogotá.
 
 ---
 
 ## Licencia
 
-Código bajo licencia MIT. Datos epidemiológicos de fuente oficial del Distrito Capital de Bogotá.
+Código bajo licencia [MIT](LICENSE). El autor no se responsabiliza por
+modificaciones realizadas por terceros. Los datos epidemiológicos son de
+fuente oficial del Distrito Capital de Bogotá y su uso debe respetar
+las condiciones de la fuente original.
