@@ -402,9 +402,40 @@ if (file.exists(rds_md)) {
 
 cat("\n=== DIAGNÓSTICOS MODELO DEFINITIVO ===\n")
 
-rhat_md <- get_rhat_max(fit_md, grepl("AR2", MD_NOMBRE))
-ess_md  <- get_ess_min(fit_md,  grepl("AR2", MD_NOMBRE))
-div_md  <- get_divergencias(fit_md)
+draws_md_file <- file.path(RUTA_OUTPUT, paste0("draws_", MD_NOMBRE, ".rds"))
+
+draws_saved <- if (file.exists(draws_md_file)) {
+  readRDS(draws_md_file)
+} else {
+  pars_esc_s11 <- c("mu_rt","rho1","sigma_epsilon","phi")
+  if (grepl("AR2", MD_NOMBRE)) pars_esc_s11 <- append(pars_esc_s11, "rho2", after=2)
+  tryCatch({
+    list(
+      escalares = setNames(
+        lapply(pars_esc_s11, function(p) as.vector(extr_mat(fit_md, p))),
+        pars_esc_s11),
+      Rt    = extr_mat(fit_md, "Rt"),
+      f     = extr_mat(fit_md, "f"),
+      y_rep = tryCatch(extr_mat(fit_md, "y_rep"), error = function(e) NULL)
+    )
+  }, error = function(e) {
+    cat("  AVISO: draws no disponibles desde fit ni desde archivo guardado.\n")
+    NULL
+  })
+}
+
+rhat_md <- tryCatch(
+  get_rhat_max(fit_md, grepl("AR2", MD_NOMBRE)),
+  error = function(e) if (!is.null(draws_saved)) draws_saved$diagnostics$rhat else NA_real_
+)
+ess_md <- tryCatch(
+  get_ess_min(fit_md, grepl("AR2", MD_NOMBRE)),
+  error = function(e) if (!is.null(draws_saved)) draws_saved$diagnostics$ess else NA_real_
+)
+div_md <- tryCatch(
+  get_divergencias(fit_md),
+  error = function(e) if (!is.null(draws_saved)) draws_saved$diagnostics$n_div else NA_integer_
+)
 
 cat(sprintf("  Rhat_max:     %.4f %s\n", rhat_md,
             if(!is.na(rhat_md) && rhat_md<1.01) "✓" else "⚠"))
@@ -413,36 +444,31 @@ cat(sprintf("  ESS_min:      %.0f %s\n", ess_md,
 cat(sprintf("  Divergencias: %d\n", div_md))
 
 # Diagnóstico detallado
-diags_md <- fit_md$diagnostic_summary(quiet=TRUE)
+treedepth_hits <- tryCatch({
+  diags_md <- fit_md$diagnostic_summary(quiet=TRUE)
+  sum(diags_md$num_max_treedepth)
+}, error = function(e) {
+  if (!is.null(draws_saved)) draws_saved$diagnostics$treedepth_hits else NA_integer_
+})
 cat(sprintf("  Treedepth hits: %d (%.1f%%)\n",
-            sum(diags_md$num_max_treedepth),
-            100*sum(diags_md$num_max_treedepth) /
-              (N_CHAINS_MD * N_SAMPLING_MD)))
+            treedepth_hits,
+            100 * treedepth_hits / (N_CHAINS_MD * N_SAMPLING_MD)))
 
 
 # ==============================================================================
 # Checkeo de donde se concentran las Divergencias
+# (requiere CSV temporales de Stan — omitir cuando fit_md viene de .rds)
 
-
-# Verificar dimensiones
-cat("Dims diag_draws:", dim(diag_draws), "\n")
-cat("Dims draws_params:", dim(draws_params), "\n")
-
-# Solución: usar índices directamente
-div_idx    <- which(diag_draws[, "divergent__"] == 1)
-nodiv_idx  <- which(diag_draws[, "divergent__"] == 0)
-
-cat(sprintf("N divergentes: %d | N no divergentes: %d\n",
-            length(div_idx), length(nodiv_idx)))
-
-cat("\nMedias en draws divergentes vs no divergentes:\n")
-for (p in c("mu_rt","rho1","sigma_epsilon","phi")) {
-  v       <- draws_params[[p]]
-  m_div   <- mean(v[div_idx])
-  m_nodiv <- mean(v[nodiv_idx])
-  cat(sprintf("  %-15s div=%.3f  no_div=%.3f  diff=%.3f\n",
-              p, m_div, m_nodiv, abs(m_div - m_nodiv)))
-}
+# # diag_draws   <- fit_md$sampler_diagnostics(format = "matrix")
+# # draws_params <- as.data.frame(fit_md$draws(
+# #   c("mu_rt","rho1","sigma_epsilon","phi"), format = "matrix"))
+# # div_idx   <- which(diag_draws[, "divergent__"] == 1)
+# # nodiv_idx <- which(diag_draws[, "divergent__"] == 0)
+# # for (p in c("mu_rt","rho1","sigma_epsilon","phi")) {
+# #   v <- draws_params[[p]]
+# #   cat(sprintf("  %-15s div=%.3f  no_div=%.3f\n",
+# #               p, mean(v[div_idx]), mean(v[nodiv_idx])))
+# # }
 
 # ==============================================================================
 
@@ -453,20 +479,35 @@ for (p in c("mu_rt","rho1","sigma_epsilon","phi")) {
 cat("\n=== POSTERIORS MODELO DEFINITIVO ===\n")
 
 tiene_rho2 <- grepl("AR2", MD_NOMBRE)
-cat(sprintf("  phi           = %s\n", fmt_post(fit_md, "phi")))
-cat(sprintf("  rho1          = %s\n", fmt_post(fit_md, "rho1")))
+
+fmt_post_robust <- function(param) {
+  tryCatch(
+    fmt_post(fit_md, param),
+    error = function(e) {
+      v <- draws_saved$escalares[[param]]
+      sprintf("%.3f [%.3f, %.3f]", mean(v), quantile(v, .025), quantile(v, .975))
+    }
+  )
+}
+
+cat(sprintf("  phi           = %s\n", fmt_post_robust("phi")))
+cat(sprintf("  rho1          = %s\n", fmt_post_robust("rho1")))
 if (tiene_rho2)
-  cat(sprintf("  rho2          = %s\n", fmt_post(fit_md, "rho2")))
-cat(sprintf("  sigma_epsilon = %s\n", fmt_post(fit_md, "sigma_epsilon")))
-cat(sprintf("  mu_rt         = %s\n", fmt_post(fit_md, "mu_rt")))
+  cat(sprintf("  rho2          = %s\n", fmt_post_robust("rho2")))
+cat(sprintf("  sigma_epsilon = %s\n", fmt_post_robust("sigma_epsilon")))
+cat(sprintf("  mu_rt         = %s\n", fmt_post_robust("mu_rt")))
 cat(sprintf("  Rt medio      = %.3f\n",
-            mean(exp(as.vector(extr_mat(fit_md, "mu_rt"))))))
+            mean(exp(tryCatch(
+              as.vector(extr_mat(fit_md, "mu_rt")),
+              error = function(e) draws_saved$escalares$mu_rt)))))
 
 # Guardar tabla posterior
 pars_md <- c("phi","rho1","sigma_epsilon","mu_rt")
 if (tiene_rho2) pars_md <- append(pars_md, "rho2", after=2)
 post_md <- do.call(rbind, lapply(pars_md, function(p) {
-  v <- as.vector(extr_mat(fit_md, p))
+  v <- tryCatch(
+    as.vector(extr_mat(fit_md, p)),
+    error = function(e) draws_saved$escalares[[p]])
   data.frame(parametro=p, media=mean(v),
              q025=quantile(v,.025), q975=quantile(v,.975))
 }))
@@ -494,9 +535,14 @@ if (!file.exists(draws_md_file)) {
     log_lik  = extr_ll(fit_md),
     log_Rt   = extr_mat(fit_md, "log_Rt"),
     y_pred   = extr_mat(fit_md, "y_pred"),
-    f        = extr_mat(fit_md, "f"),
-    meta     = list(modelo=MD_NOMBRE, n_draws=N_CHAINS_MD*N_SAMPLING_MD,
-                    fecha=Sys.time())
+    y_rep       = extr_mat(fit_md, "y_rep"),
+    f           = extr_mat(fit_md, "f"),
+    diagnostics = list(rhat           = rhat_md,
+                       ess            = ess_md,
+                       n_div          = div_md,
+                       treedepth_hits = treedepth_hits),
+    meta        = list(modelo=MD_NOMBRE, n_draws=N_CHAINS_MD*N_SAMPLING_MD,
+                       fecha=Sys.time())
   )
   saveRDS(draws_md, draws_md_file)
   cat(sprintf("✓ draws guardados (%.1f MB)\n",
@@ -576,8 +622,8 @@ tryCatch({
 
 # --- Fig 3: Ajuste modelo definitivo ---
 tryCatch({
-  f_m  <- extr_mat(fit_md, "f")
-  Rt_m <- extr_mat(fit_md, "Rt")
+  f_m  <- tryCatch(extr_mat(fit_md, "f"),  error = function(e) draws_saved$f)
+  Rt_m <- tryCatch(extr_mat(fit_md, "Rt"), error = function(e) draws_saved$Rt)
 
   rf <- data.frame(fecha=grilla, obs=y_obs,
                    pred=colMeans(f_m),
@@ -621,7 +667,15 @@ tryCatch({
 
 # --- Fig 4: PPC modelo definitivo ---
 tryCatch({
-  yrep_m <- extr_mat(fit_md, "y_rep")
+  yrep_m <- tryCatch(
+    extr_mat(fit_md, "y_rep"),
+    error = function(e) {
+      draws_saved <- readRDS(draws_md_file)
+      if (!is.null(draws_saved$y_rep)) return(draws_saved$y_rep)
+      stop("y_rep no disponible en fit ni en draws guardados. ",
+           "Elimina ", basename(draws_md_file), " y re-corre para regenerarlo.")
+    }
+  )
   idx_s  <- sample(seq_len(nrow(yrep_m)), min(200L, nrow(yrep_m)))
   pdf(file.path(RUTA_OUTPUT, "fig4_ppc_definitivo.pdf"), width=10, height=5)
   print(ppc_dens_overlay(y=y_obs, yrep=yrep_m[idx_s,],
@@ -635,13 +689,14 @@ tryCatch({
 
 
 
+tryCatch({
 ### Figura Ajuste
 # Generar fig2_sensibilidad_componentes.pdf
 library(ggplot2)
 library(dplyr)
 
-RUTA_OUTPUT <- "C:/Users/GeorgeHarrisonPlataB/OneDrive - SQDM/Documentos George/MODELO_STAN/MODELO_STAN_DEFINITIVO"
-RUTA_PRELIM <- "C:/Users/GeorgeHarrisonPlataB/OneDrive - SQDM/Documentos George/MODELO_STAN/MODELO_STAN_4/EXOGENO_GAMMA_ANALISIS_PRELIMINAR"
+RUTA_OUTPUT <- here("MODELO_STAN_DEFINITIVO")
+RUTA_PRELIM <- here("MODELO_STAN_4", "EXOGENO_GAMMA_ANALISIS_PRELIMINAR")
 
 grilla <- seq(as.Date("2020-03-14"), as.Date("2020-03-14") + 179L, by="day")
 
@@ -716,6 +771,7 @@ ggsave(file.path(RUTA_OUTPUT, "fig2_sensibilidad_componentes.pdf"),
 ggsave(file.path(RUTA_OUTPUT, "fig2_sensibilidad_componentes.png"),
        p, width=12, height=6, dpi=300)
 cat("✓ fig2_sensibilidad_componentes generada\n")
+}, error = function(e) cat("  ✗ fig2 sensibilidad (reconstrucción):", conditionMessage(e), "\n"))
 
 # ==============================================================================
 # SECCIÓN 15: RESUMEN FINAL
