@@ -1,15 +1,17 @@
 // =============================================================================
-//  Ecuación de Renovación Bayesiana — COVID-19 Bogotá
-//  Modelo: NB-2 con AR(2) sobre log(Rt)
-//  Exógeno: Exponencial(lambda_mu) — especificación de Mishra et al. (2020)
+//  Ecuacion de Renovacion Bayesiana - COVID-19 Bogota
+//  Modelo: NB-2 con AR(1) sobre log(Rt)
+//  Exogeno: Exponencial(lambda_mu)
 //
-//  Propósito: comparar prior exógeno Gamma vs Exponencial en Fase 2
+//  Proposito: Fase 2 con IS China-Gamma. Comparar la familia del componente
+//  exogeno (Gamma vs Exponencial) SOBRE EL PROCESO DEL MODELO DEFINITIVO,
+//  cambiando un solo componente.
 //
-//  Diferencia respecto a renewal_bogota_nb2_ar2_gamma.stan:
-//    - Exógeno: mu_exo[t] ~ exponential(lambda_mu)
-//    - lambda_mu = 1/8.33 = 0.120 (media empírica importados)
-//    - Elimina alpha_mu/beta_mu, agrega lambda_mu
-//    - Sigue especificación original de Mishra et al. (2020)
+//  Construido a partir de renewal_bogota_nb2_ar1_gamma.stan. UNICAS diferencias:
+//    - data: se reemplazan alpha_mu, beta_mu por lambda_mu
+//    - model: mu_exo[t] ~ exponential(lambda_mu) en lugar de gamma(alpha_mu, beta_mu)
+//  El exogeno Exponencial es identico al de renewal_bogota_nb2_ar2_exponencial.stan
+//  (lambda_mu = 0.120 = 1/8.33). Todo lo demas es identico al AR(1) + Gamma.
 // =============================================================================
 
 data {
@@ -22,17 +24,16 @@ data {
 }
 
 parameters {
-  // --- AR(2) sobre log(Rt) ---
+  // --- AR(1) sobre log(Rt) ---
   real mu_rt;
   real<lower=0, upper=1> rho1;
-  real<lower=0, upper=1> rho2;
   real<lower=0> sigma_epsilon;
   vector[T] epsilon_raw;
 
-  // --- Exógeno: Exponencial ---
+  // --- Exogeno: Exponencial ---
   vector<lower=0>[n_exogeno] mu_exo;
 
-  // --- Sobredispersión NB-2 ---
+  // --- Sobredispersion NB-2 ---
   real<lower=0> phi;
 }
 
@@ -42,16 +43,12 @@ transformed parameters {
   vector<lower=0>[T] mu;
   vector<lower=0>[T] f;
 
-  // --- AR(2) estacionario (parametrización no centrada) ---
+  // --- AR(1) estacionario (parametrizacion no centrada) ---
   {
-    real denom = 1 - rho1^2 - rho2^2 -
-                 2 * rho1^2 * rho2 / (1 - rho2);
-    real sigma_stat = sigma_epsilon / sqrt(fmax(denom, 1e-6));
+    real sigma_stat = sigma_epsilon / sqrt(fmax(1 - rho1^2, 1e-6));
     epsilon[1] = sigma_stat * epsilon_raw[1];
-    epsilon[2] = rho1 * epsilon[1] + sigma_epsilon * epsilon_raw[2];
-    for (t in 3:T)
-      epsilon[t] = rho1*epsilon[t-1] + rho2*epsilon[t-2] +
-                   sigma_epsilon * epsilon_raw[t];
+    for (t in 2:T)
+      epsilon[t] = rho1 * epsilon[t-1] + sigma_epsilon * epsilon_raw[t];
   }
 
   for (t in 1:T)
@@ -70,21 +67,17 @@ transformed parameters {
 }
 
 model {
-  // --- Priors AR(2) ---
+  // --- Priors AR(1) (identicos al AR(1) + Gamma) ---
   mu_rt         ~ normal(0.0, 0.3);
   rho1          ~ normal(0.7, 0.15);
-  rho2          ~ normal(0.1, 0.10);
   sigma_epsilon ~ normal(0.0, 0.2) T[0,];
   epsilon_raw   ~ std_normal();
 
-  // --- Prior exógeno: Exponencial ---
-  // lambda_mu = 0.120 calibrado sobre media empírica (8.33 casos/día)
-  // Sigue especificación de Mishra et al. (2020)
-  // Nota: moda = 0 (diferencia clave vs Gamma que tiene moda > 0)
+  // --- Prior exogeno: Exponencial (unico cambio) ---
   for (t in 1:n_exogeno)
     mu_exo[t] ~ exponential(lambda_mu);
 
-  // --- Sobredispersión NB-2 ---
+  // --- Sobredispersion NB-2 ---
   phi ~ normal(0.0, 5.0) T[0,];
 
   // --- Verosimilitud ---
