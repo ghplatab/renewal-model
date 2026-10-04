@@ -31,19 +31,18 @@ renewal-model/
 │   ├── fase1_exploratoria/         # filtro de convergencia: 10 especificaciones
 │   │   ├── analisis_bogota_ar2_gamma.R
 │   │   ├── metricas_loo_sensibilidad_AR.R
+│   │   ├── sigma_poisson_vs_nb2.R
 │   │   └── grafica_estacionariedad.R
 │   │
 │   └── fase2_definitiva/           # modelo definitivo y diagnósticos
-│       ├── 01_cobertura_predictiva.R
-│       ├── 02_diagnosticos_posteriores.R
-│       ├── 03_corridas_ar1_y_rw.R
-│       ├── 04_trayectorias_ar1_vs_rw.R
-│       ├── 05_consistencia_corrida_final.R
-│       ├── 06_fase2_china_gamma.R
-│       ├── 07_cifras_modelo_definitivo.R
-│       ├── 08_figuras_modelo_definitivo.R
-│       ├── 09_respaldo_intervenciones.R
-│       └── 10_verificacion_predictiva.R
+│       ├── 01_corridas_ar1_y_rw.R
+│       ├── 02_trayectorias_ar1_vs_rw.R
+│       ├── 03_consistencia_corrida_final.R
+│       ├── 04_ajuste_china_gamma.R
+│       ├── 05_cifras_modelo_definitivo.R
+│       ├── 06_figuras_modelo_definitivo.R
+│       ├── 07_respaldo_intervenciones.R
+│       └── 08_verificacion_predictiva.R
 │
 ├── resultados/                     # salidas numéricas (CSV)
 └── README.md
@@ -216,8 +215,11 @@ Sistema: Windows 11, R 4.2.2 con Rtools correspondiente.
 
 ## Orden de ejecución
 
-> Los scripts contienen rutas absolutas del equipo en que se ejecutaron. Antes de
-> correrlos hay que ajustar la variable de ruta al inicio de cada archivo.
+> Todas las rutas son relativas a la raíz del repositorio, mediante el paquete
+> `here`. No hay que ajustar nada: basta con abrir el proyecto en la carpeta
+> clonada. Los ajustes MCMC (`.rds`) no se distribuyen por su tamaño, de modo
+> que cada fase debe ejecutarse en orden para generar las entradas de la
+> siguiente.
 
 ### Fase 1 — Filtro exploratorio de convergencia
 
@@ -227,6 +229,7 @@ Ajusta 10 modelos: 5 intervalos seriales × 2 distribuciones de observación
 ```r
 source("R/fase1_exploratoria/analisis_bogota_ar2_gamma.R")      # ≈ 4-5 h
 source("R/fase1_exploratoria/metricas_loo_sensibilidad_AR.R")   # < 1 min
+source("R/fase1_exploratoria/sigma_poisson_vs_nb2.R")           # < 1 min
 source("R/fase1_exploratoria/grafica_estacionariedad.R")
 ```
 
@@ -239,18 +242,18 @@ parte.
 ### Fase 2 — Modelo definitivo
 
 ```r
-source("R/fase2_definitiva/06_fase2_china_gamma.R")        # ≈ 30-45 min por modelo
-source("R/fase2_definitiva/07_cifras_modelo_definitivo.R")
-source("R/fase2_definitiva/08_figuras_modelo_definitivo.R")
-source("R/fase2_definitiva/10_verificacion_predictiva.R")
+source("R/fase2_definitiva/04_ajuste_china_gamma.R")          # ≈ 30-45 min por modelo
+source("R/fase2_definitiva/05_cifras_modelo_definitivo.R")
+source("R/fase2_definitiva/06_figuras_modelo_definitivo.R")
+source("R/fase2_definitiva/08_verificacion_predictiva.R")
 ```
 
-Los scripts `01`–`05` contienen las verificaciones previas sobre la corrida
-con `adapt_delta = 0.99`: cobertura de los intervalos predictivos,
-diagnósticos de la posterior, ajuste de las corridas AR(1) y paseo aleatorio,
-comparación de trayectorias y consistencia de las cifras derivadas. El `09`
-recoge el análisis exploratorio de intervenciones, que no se reporta entre los
-hallazgos y se conserva como respaldo de esa decisión.
+Los scripts `01`–`03` corresponden a las etapas previas: el ajuste de las
+corridas AR(1) y paseo aleatorio con `adapt_delta = 0.99`, la comparación de
+sus trayectorias y la consistencia de las cantidades derivadas entre
+configuraciones del muestreador. El `07` recoge el análisis exploratorio de
+intervenciones, que no se reporta entre los hallazgos y se conserva como
+respaldo de esa decisión.
 
 ---
 
@@ -267,7 +270,8 @@ cifra del documento, entre ellas:
 | `f2cg_trayectorias_resumen.csv` | R(t) máximo, fecha de cruce del umbral |
 | `ppc_cobertura_sin_represas.csv` | Cobertura de los intervalos predictivos |
 | `ppc_represas_reporte.csv` | Días de notificación anómala |
-| `paso5_residuos.csv` | Residuos de Pearson y casos diarios |
+| `def_residuos.csv` | Residuos de Pearson y casos diarios observados |
+| `fase1_exploratoria/sigma_poisson_vs_nb2.csv` | Escala de las innovaciones en las diez especificaciones preliminares |
 
 ---
 

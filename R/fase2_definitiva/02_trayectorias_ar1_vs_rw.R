@@ -18,18 +18,17 @@
 
 
 # =============================================================================
-#  PASO 0 - CARGA
+#  CONFIGURACION Y CARGA DE DATOS
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(cmdstanr); library(posterior); library(ggplot2)
-  library(dplyr); library(tidyr); library(readxl)
+  library(dplyr); library(tidyr); library(readxl); library(here)
 })
 
-BASE <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                  "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-SEP  <- file.path(BASE, "AJUSTES_SEP_2026")
-OUT  <- file.path(SEP, "resultados"); FIG <- file.path(SEP, "figuras")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OUT <- here("resultados"); FIG <- here("figuras")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
 fechas <- seq(as.Date("2020-03-14"), as.Date("2020-09-09"), by = "day")
 T_P    <- length(fechas)
@@ -63,7 +62,7 @@ s_rw  <- resumir(Rt_rw,  "Random walk")
 
 
 # =============================================================================
-#  PASO 1 - CUANTO SE PARECEN LAS TRAYECTORIAS
+#  PASO 1 - ACUERDO ENTRE LAS TRAYECTORIAS
 # =============================================================================
 
 cat("\n=== PASO 1: ACUERDO ENTRE TRAYECTORIAS ===\n")
@@ -82,8 +81,8 @@ cat("\n  Dias con diferencia mayor que:\n")
 for (u in c(0.05, 0.10, 0.20, 0.43))
   cat(sprintf("    %.2f : %3d de %d  (%.1f%%)\n",
               u, sum(abs(dif) > u), T_P, 100 * mean(abs(dif) > u)))
-cat("  (el 0.43 es el rango promedio diario entre intervalos seriales que\n")
-cat("   reporta tu tesis: sirve de vara para comparar magnitudes)\n")
+cat("  (0.43 es el rango promedio diario de R(t) entre especificaciones del\n")
+cat("   intervalo serial, incluido como referencia de magnitud)\n")
 
 
 # =============================================================================
@@ -121,17 +120,16 @@ cat(sprintf("  Mediana RW dentro de la banda del AR(1) : %.1f%% de los dias\n",
 
 
 # =============================================================================
-#  PASO 3 - LAS CANTIDADES EPIDEMIOLOGICAS DE LA SECCION 3.2.9
+#  PASO 3 - CANTIDADES EPIDEMIOLOGICAS EN FECHAS DE REFERENCIA
 #
-#  Estas son las que aparecen en el texto y en la Tabla 3-14. Si coinciden
-#  entre modelos, esa seccion sobrevive sin cambios.
-#
-#  AJUSTA ESTE VECTOR con las fechas reales de tu Tabla 3-14.
-#  La del 25 de marzo (Decreto 457, cuarentena obligatoria) sale del texto
-#  de tu tesis; las demas son marcas mensuales de referencia.
+#  El 25 de marzo corresponde a la entrada en vigor de la cuarentena
+#  nacional obligatoria (Decreto 457 de 2020); las restantes son marcas
+#  mensuales de referencia. La coincidencia de R(t) en estas fechas entre
+#  ambas especificaciones indica en que medida las conclusiones sobre la
+#  trayectoria dependen del proceso latente elegido.
 # =============================================================================
 
-cat("\n=== PASO 3: R(t) EN FECHAS CLAVE ===\n")
+cat("\n=== R(t) EN FECHAS DE REFERENCIA ===\n")
 
 hitos <- as.Date(c("2020-03-14", "2020-03-25", "2020-04-15", "2020-05-15",
                    "2020-06-15", "2020-07-15", "2020-08-15", "2020-09-09"))

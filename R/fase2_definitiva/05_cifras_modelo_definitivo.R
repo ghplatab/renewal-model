@@ -2,7 +2,7 @@
 #  CIFRAS DEL MODELO DEFINITIVO
 #  Modelo bayesiano de renovacion - COVID-19 Bogota
 #
-#  Calcula, sobre los ajustes producidos por el script 06, el conjunto de
+#  Calcula, sobre los ajustes producidos por el script 04, el conjunto de
 #  cantidades derivadas que se reportan en el documento:
 #
 #    - Cobertura de los intervalos predictivos
@@ -24,17 +24,15 @@
 suppressPackageStartupMessages({
   library(cmdstanr); library(posterior); library(loo)
   library(readxl); library(dplyr); library(ggplot2)
-  library(scales); library(gridExtra); library(grid)
+  library(scales); library(gridExtra); library(grid); library(here)
 })
 
-BASE <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                  "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-SEP   <- file.path(BASE, "AJUSTES_SEP_2026")
-OLD   <- file.path(SEP, "resultados")
-OUT   <- file.path(OLD, "fase2_chinagamma")
-FIG   <- file.path(SEP, "figuras", "fase2_chinagamma")
-DATOS <- file.path(BASE, "Documentos George", "MODELO_STAN",
-                   "MODELO_STAN_4", "datos_agregados.xlsx")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OLD   <- here("resultados")
+OUT   <- here("resultados", "fase2_chinagamma")
+FIG   <- here("figuras",    "fase2_chinagamma")
+DATOS <- here("data", "datos_agregados.xlsx")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
 df_raw <- as.data.frame(read_excel(DATOS, sheet = "NO_IMPORTADOS"))
 names(df_raw) <- c("fecha", "casos")
@@ -322,13 +320,13 @@ ggsave(file.path(FIG, "def_trayectorias_ar1_vs_rw.png"), p,
 
 
 # =============================================================================
-#  PASO 9 - NUCLEO VIEJO (10.5 d) vs NUEVO (CHINA-GAMMA)
+#  PASO 9 - SENSIBILIDAD AL INTERVALO SERIAL: 10,5 DIAS vs CHINA-GAMMA
 #
 #  La columna "nuevo" de consistencia_viejo_vs_nuevo.csv son las cifras del
 #  definitivo con el nucleo de 10.5 dias: las que hoy estan redactadas.
 # =============================================================================
 
-cat("\n=== PASO 9: QUE CIFRAS CAMBIAN EN EL TEXTO ===\n")
+cat("\n=== PASO 9: SENSIBILIDAD AL INTERVALO SERIAL ===\n")
 prev <- read.csv(file.path(OLD, "consistencia_viejo_vs_nuevo.csv"))
 etiq <- c(
   cob50 = "Cobertura IC50 (%)", cob80 = "Cobertura IC80 (%)", cob95 = "Cobertura IC95 (%)",
@@ -367,4 +365,4 @@ cat(sprintf("    Mediana estacionaria [%.3f, %.3f] | Media [%.3f, %.3f] | Vida m
             nuevo$vid_lo, nuevo$vid_hi))
 write.csv(tabla, file.path(OUT, "def_viejo_vs_nuevo_cifras.csv"), row.names = FALSE)
 cat("\n  Guardado: def_viejo_vs_nuevo_cifras.csv\n")
-cat("\n=== SCRIPT 07 COMPLETO ===\n")
+cat("\n=== CIFRAS DEL MODELO DEFINITIVO COMPLETAS ===\n")

@@ -32,49 +32,43 @@
 
 
 # =============================================================================
-#  PASO 0 - CONFIGURACION
+#  CONFIGURACION
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(readxl); library(dplyr); library(cmdstanr)
   library(posterior); library(loo); library(bayesplot); library(ggplot2)
+  library(here)
 })
 
 CMDSTAN_DIR <- Sys.getenv("CMDSTAN", unset = "C:/cmdstan/cmdstan-2.39.0")
 if (!dir.exists(CMDSTAN_DIR)) stop("No encuentro CmdStan en: ", CMDSTAN_DIR)
 set_cmdstan_path(CMDSTAN_DIR)
 
-BASE      <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                       "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-STAN_ROOT <- file.path(BASE, "Documentos George", "MODELO_STAN")
-SEP       <- file.path(BASE, "AJUSTES_SEP_2026")
-DEF_ORIG  <- file.path(STAN_ROOT, "MODELO_REPO_GITHUB", "MODELO_STAN_DEFINITIVO")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OUT_OLD <- here("resultados")                     # corridas con el núcleo previo
+OUT     <- here("resultados", "fase2_chinagamma")
+FIG     <- here("figuras",    "fase2_chinagamma")
+STAN    <- here("stan")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
-OUT_OLD <- file.path(SEP, "resultados")                    # corridas viejas (10.5 d)
-OUT     <- file.path(SEP, "resultados", "fase2_chinagamma")
-FIG     <- file.path(SEP, "figuras",    "fase2_chinagamma")
-STAN    <- file.path(SEP, "stan")
-for (p in c(OUT, FIG, STAN)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
-
+# CmdStan corrompe sus CSV de salida en rutas con caracteres no ASCII bajo
+# Windows, de modo que la compilación y los CSV crudos se dirigen a rutas
+# planas fuera del árbol del proyecto.
 BUILD <- "C:/stan_build"; CSVOUT <- "C:/stan_out"
 dir.create(BUILD,  showWarnings = FALSE, recursive = TRUE)
 dir.create(CSVOUT, showWarnings = FALSE, recursive = TRUE)
 
 # --- Modelos Stan -------------------------------------------------------------
-# AR(1)+Gamma y RW ya estan en AJUSTES_SEP_2026/stan (copiados en el script 03).
-# AR(2)+Gamma se copia sin modificar desde tu carpeta del modelo definitivo.
-# AR(1)+Exponencial es nuevo: el AR(1)+Gamma con solo la linea del exogeno cambiada.
+# Los cuatro difieren del definitivo en un solo componente: el orden del
+# proceso latente (M1, M2) o la familia del componente exógeno (M3).
 STAN_M0 <- file.path(STAN, "renewal_bogota_nb2_ar1_gamma.stan")
 STAN_M1 <- file.path(STAN, "renewal_bogota_nb2_ar2_gamma.stan")
 STAN_M2 <- file.path(STAN, "renewal_bogota_nb2_rw_gamma.stan")
 STAN_M3 <- file.path(STAN, "renewal_bogota_nb2_ar1_exponencial.stan")
-if (!file.exists(STAN_M0))
-  file.copy(file.path(DEF_ORIG, "renewal_bogota_nb2_ar1_gamma.stan"), STAN_M0)
-if (!file.exists(STAN_M1))
-  file.copy(file.path(DEF_ORIG, "renewal_bogota_nb2_ar2_gamma.stan"), STAN_M1)
 
-# --- Datos (identico a analisis_fase2_definitivo.R) --------------------------
-DATOS  <- file.path(STAN_ROOT, "MODELO_STAN_4", "datos_agregados.xlsx")
+# --- Datos -------------------------------------------------------------------
+DATOS  <- here("data", "datos_agregados.xlsx")
 df_raw <- as.data.frame(read_excel(DATOS, sheet = "NO_IMPORTADOS"))
 names(df_raw) <- c("fecha", "casos")
 df_raw <- df_raw[!grepl("nan", as.character(df_raw$fecha), ignore.case = TRUE), ]
@@ -91,7 +85,7 @@ T_PERIODO <- 180L; N_EXOGENO <- 12L; MAX_SI <- 30L
 ALPHA_MU  <- 1.401; BETA_MU <- 0.168     # exogeno Gamma (MoM)
 LAMBDA_MU <- 0.120                       # exogeno Exponencial (1/8.33)
 
-# --- Intervalo serial: CHINA-GAMMA (el unico cambio respecto a la version vieja)
+# --- Intervalo serial China-Gamma, discretizado para Stan -------------------
 discret_si <- function(pfun, ...) {
   g <- numeric(MAX_SI); g[1] <- pfun(1.5, ...) - pfun(0, ...)
   for (s in 2:MAX_SI) g[s] <- pfun(s + 0.5, ...) - pfun(s - 0.5, ...)
@@ -114,7 +108,7 @@ datos_exp   <- list(T = T_PERIODO, n_exogeno = N_EXOGENO, max_si = MAX_SI,
 N_CHAINS <- 4L; N_WARMUP <- 1500L; N_SAMPLING <- 1500L
 ADAPT_DELTA <- 0.99; MAX_TREEDEPTH <- 12L; SEED <- 42
 
-# --- Valores iniciales (los mismos de tus scripts) ----------------------------
+# --- Valores iniciales comunes a los cuatro modelos ---------------------------
 init_ar1 <- function() list(mu_rt = 0.0, rho1 = 0.8, sigma_epsilon = 0.1,
                             epsilon_raw = rep(0.0, T_PERIODO),
                             mu_exo = rep(ALPHA_MU / BETA_MU, N_EXOGENO), phi = 4.0)
@@ -165,25 +159,26 @@ PARS_AR1 <- c("mu_rt", "rho1", "sigma_epsilon", "phi")
 PARS_AR2 <- c("mu_rt", "rho1", "rho2", "sigma_epsilon", "phi")
 PARS_RW  <- c("log_Rt1", "sigma_epsilon", "phi")
 
-cat("=== PASO 0 OK ===\n")
+cat("=== CONFIGURACION VERIFICADA ===\n")
 cat(sprintf("  R %s | CmdStan %s\n", getRversion(), cmdstan_version()))
 cat(sprintf("  Datos: %d dias, %s casos\n", length(y_obs), format(sum(y_obs), big.mark = ",")))
-cat(sprintf("  IS China-Gamma : media %.2f  DE %.2f   (debe ser 6.36 / 4.17)\n",
+cat(sprintf("  IS China-Gamma : media %.2f  DE %.2f   (esperado: 6.36 / 4.17)\n",
             media_g(g_cg), de_g(g_cg)))
-cat(sprintf("  IS viejo       : media %.2f  DE %.2f   (solo referencia, NO se usa)\n",
+cat(sprintf("  IS viejo       : media %.2f  DE %.2f   (nucleo previo, solo comparacion)\n",
             media_g(g_old), de_g(g_old)))
 cat(sprintf("  Stan M0 AR1+Gamma: %s | M1 AR2+Gamma: %s | M2 RW: %s | M3 AR1+Exp: %s\n",
             file.exists(STAN_M0), file.exists(STAN_M1), file.exists(STAN_M2), file.exists(STAN_M3)))
 
 
 # =============================================================================
-#  PASO 1 - PRIOR PREDICTIVE CHECK DEL DEFINITIVO   (obs. 3a)     ~2 min, sin Stan
+#  VERIFICACION PREDICTIVA A PRIORI
 #
-#  Igual al PASO 8 del script 02, pero con el IS China-Gamma. Simula de las
-#  previas del AR(1)+Gamma y mira que epidemias implican, antes de ver datos.
+#  Simula trayectorias desde las previas del AR(1) + Gamma, con el intervalo
+#  serial China-Gamma, para examinar que epidemias resultan implicadas antes
+#  de condicionar en los datos. No requiere Stan.
 # =============================================================================
 
-cat("\n=== PASO 1: PRIOR PREDICTIVE CHECK (IS China-Gamma) ===\n")
+cat("\n=== VERIFICACION PREDICTIVA A PRIORI (IS China-Gamma) ===\n")
 
 rnorm_trunc <- function(mean, sd, lo, hi) {
   repeat { v <- rnorm(1, mean, sd); if (v > lo && v < hi) return(v) }
@@ -250,7 +245,9 @@ fit_m0 <- correr("f2cg_M0_ar1_gamma", STAN_M0, datos_gamma, init_ar1, PARS_AR1)
 # Las figuras van dentro de try(): si una falla, el script sigue con los
 # modelos siguientes (importante cuando se deja corriendo de noche).
 
-# Pairs plot con divergencias marcadas (obs. 5 y hallazgo de la raiz unitaria)
+# Grafico de pares con las transiciones divergentes marcadas: permite situar
+# las divergencias en la geometria de la posterior, en particular la region
+# de alta persistencia donde rho1 se aproxima a la raiz unitaria.
 try({
   p <- mcmc_pairs(fit_m0$draws(PARS_AR1), np = nuts_params(fit_m0),
                   off_diag_args = list(size = 0.6, alpha = 0.4))
@@ -287,7 +284,7 @@ try({
 
 
 # =============================================================================
-#  PASO 4 - M2: RANDOM WALK + GAMMA   (reversion a la media, obs. 4)  ~30-45 min
+#  PASO 4 - M2: RANDOM WALK + GAMMA   (reversion a la media)  ~30-45 min
 # =============================================================================
 
 cat("\n=== PASO 4: M2 Random walk + Gamma ===\n")
@@ -420,13 +417,15 @@ write.csv(largo, file.path(OUT, "f2cg_largo_plazo.csv"), row.names = FALSE)
 
 
 # =============================================================================
-#  PASO 7 - DEFINITIVO VIEJO (10.5 d) vs NUEVO (China-Gamma)   ~2 min, sin Stan
+#  SENSIBILIDAD AL NUCLEO: 10,5 DIAS FRENTE A CHINA-GAMMA
 #
-#  Base del paso 3 del plan: que se recicla y que cambia en el documento.
-#  Viejo: resultados/corrida1_ar1_ad099.rds y corrida3_rw.rds (script 03).
+#  Cuantifica cuanto se desplazan las posteriores y las trayectorias de R(t)
+#  al sustituir el intervalo serial de media 10,5 dias por China-Gamma, con
+#  el resto de la especificacion sin cambios. Las corridas con el nucleo
+#  previo provienen del script 01.
 # =============================================================================
 
-cat("\n=== PASO 7: DEFINITIVO VIEJO vs NUEVO ===\n")
+cat("\n=== SENSIBILIDAD AL INTERVALO SERIAL ===\n")
 
 old_ar1 <- readRDS(file.path(OUT_OLD, "corrida1_ar1_ad099.rds"))
 old_rw  <- readRDS(file.path(OUT_OLD, "corrida3_rw.rds"))
@@ -464,5 +463,5 @@ cat(sprintf("  AR(1): dias con |Rt viejo - Rt nuevo| > 0.2: %d de %d\n",
             sum(abs(Rt_viejo - Rt_nuevo) > 0.2), T_PERIODO))
 cat("  Guardado: f2cg_viejo_vs_nuevo.csv\n")
 
-cat("\n=== SCRIPT 06 COMPLETO ===\n")
+cat("\n=== AJUSTE CHINA-GAMMA COMPLETO ===\n")
 cat("Pega en el chat la salida de los PASOS 1, 6 y 7 (y los diagnosticos de 2-5).\n")

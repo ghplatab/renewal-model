@@ -26,13 +26,14 @@
 #  No ajusta modelos: opera sobre draws ya guardados.
 # =============================================================================
 
-suppressPackageStartupMessages({ library(cmdstanr); library(posterior) })
+suppressPackageStartupMessages({
+  library(cmdstanr); library(posterior); library(here)
+})
 set_cmdstan_path(Sys.getenv("CMDSTAN", unset = "C:/cmdstan/cmdstan-2.39.0"))
 
-BASE <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                  "Tesis Maestr\u00eda", "AJUSTES_2026", "AJUSTES_PROFE_JCS",
-                  "AJUSTES_SEP_2026", "resultados")
-OUT  <- file.path(BASE, "respaldo_intervenciones")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+RES <- here("resultados")
+OUT <- here("resultados", "respaldo_intervenciones")
 dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 
 fechas <- seq(as.Date("2020-03-14"), by = "day", length.out = 180)
@@ -74,12 +75,12 @@ analizar <- function(R, modelo) {
 }
 
 cat("=== Modelo viejo (nucleo 10.5 d) ===\n")
-fit <- readRDS(file.path(BASE, "corrida1_ar1_ad099.rds"))
+fit <- readRDS(file.path(RES, "corrida1_ar1_ad099.rds"))
 viejo <- analizar(fit$draws("Rt", format = "matrix"), "viejo_IS_10.5d")
 rm(fit); gc(verbose = FALSE)
 
 cat("=== Modelo nuevo (China-Gamma) ===\n")
-fit <- readRDS(file.path(BASE, "fase2_chinagamma", "f2cg_M0_ar1_gamma.rds"))
+fit <- readRDS(file.path(RES, "fase2_chinagamma", "f2cg_M0_ar1_gamma.rds"))
 nuevo <- analizar(fit$draws("Rt", format = "matrix"), "nuevo_ChinaGamma")
 rm(fit); gc(verbose = FALSE)
 

@@ -22,15 +22,14 @@
 # =============================================================================
 
 suppressPackageStartupMessages({
-  library(cmdstanr); library(posterior); library(ggplot2); library(dplyr)
+  library(cmdstanr); library(posterior); library(ggplot2); library(dplyr); library(here)
 })
 set_cmdstan_path(Sys.getenv("CMDSTAN", unset = "C:/cmdstan/cmdstan-2.39.0"))
 
-SEP <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                 "Tesis Maestr\u00eda", "AJUSTES_2026", "AJUSTES_PROFE_JCS",
-                 "AJUSTES_SEP_2026")
-OUT <- file.path(SEP, "resultados", "fase2_chinagamma")
-FIG <- file.path(SEP, "figuras", "fase2_chinagamma")
+# --- Rutas relativas a la ra\u00edz del repositorio -------------------------------
+OUT <- here("resultados", "fase2_chinagamma")
+FIG <- here("figuras",    "fase2_chinagamma")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
 res   <- read.csv(file.path(OUT, "def_residuos.csv"));        res$fecha <- as.Date(res$fecha)
 fuera <- read.csv(file.path(OUT, "def_dias_fuera_banda95.csv")); fuera$fecha <- as.Date(fuera$fecha)
@@ -112,4 +111,4 @@ ggsave(file.path(FIG, "fig_ppc_marginal_cg.pdf"), p, width = 9, height = 5, devi
 ggsave(file.path(FIG, "fig_ppc_marginal_cg.png"), p, width = 9, height = 5, dpi = 200)
 cat("  Guardada: fig_ppc_marginal_cg.pdf (y .png de vista rapida)\n")
 
-cat("\n=== SCRIPT 10 COMPLETO ===\n")
+cat("\n=== VERIFICACION PREDICTIVA COMPLETA ===\n")

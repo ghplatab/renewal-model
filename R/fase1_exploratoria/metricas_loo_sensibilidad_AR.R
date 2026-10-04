@@ -2,7 +2,7 @@ library(loo)
 library(cmdstanr)
 library(here)
 
-RUTA_OUTPUT <- here("MODELO_STAN_4", "EXOGENO_GAMMA_ANALISIS_PRELIMINAR")
+RUTA_OUTPUT <- here("resultados", "fase1_exploratoria")
 
 N_CHAINS   <- 4
 N_SAMPLING <- 1000

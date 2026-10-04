@@ -22,49 +22,42 @@
 
 
 # =============================================================================
-#  PASO 0 - CONFIGURACION
+#  CONFIGURACION
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(readxl); library(dplyr); library(cmdstanr)
   library(posterior); library(loo); library(bayesplot); library(ggplot2)
+  library(here)
 })
 
 # --- CmdStan -----------------------------------------------------------------
-# .Renviron solo se lee cuando R ARRANCA. Si la sesion se abrio antes de que
-# ese archivo existiera, la variable CMDSTAN no esta y cmdstanr no encuentra
-# nada. Esto lo resuelve sin reiniciar la sesion.
+# La variable de entorno CMDSTAN se lee al arrancar R. Si no está definida,
+# se recurre a la ruta de instalación por defecto.
 CMDSTAN_DIR <- Sys.getenv("CMDSTAN", unset = "C:/cmdstan/cmdstan-2.39.0")
 if (!dir.exists(CMDSTAN_DIR))
-  stop("No encuentro CmdStan en: ", CMDSTAN_DIR,
-       "\nRevisa la ruta o corre install_cmdstan(dir = 'C:/cmdstan').")
+  stop("No se encuentra CmdStan en: ", CMDSTAN_DIR,
+       "\nDefinir la variable CMDSTAN o instalarlo con install_cmdstan().")
 set_cmdstan_path(CMDSTAN_DIR)
 
-BASE      <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                       "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-STAN_ROOT <- file.path(BASE, "Documentos George", "MODELO_STAN")
-SEP       <- file.path(BASE, "AJUSTES_SEP_2026")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OUT  <- here("resultados")
+FIG  <- here("figuras")
+STAN <- here("stan")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
-OUT  <- file.path(SEP, "resultados")
-FIG  <- file.path(SEP, "figuras")
-STAN <- file.path(SEP, "stan")
-for (p in c(OUT, FIG, STAN)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
-
-# Rutas ASCII y fuera de OneDrive: CmdStan corrompe CSV en rutas con acento
+# CmdStan corrompe sus CSV de salida en rutas con caracteres no ASCII bajo
+# Windows, de modo que la compilación y los CSV crudos se dirigen a rutas
+# planas fuera del árbol del proyecto.
 BUILD <- "C:/stan_build"; CSVOUT <- "C:/stan_out"
 dir.create(BUILD,  showWarnings = FALSE, recursive = TRUE)
 dir.create(CSVOUT, showWarnings = FALSE, recursive = TRUE)
 
-# Copiamos el .stan del AR(1) sin modificarlo, para no compilar dentro de
-# tus carpetas. La copia es identica byte a byte: misma especificacion.
-AR1_ORIG <- file.path(STAN_ROOT, "MODELO_STAN_DEFINITIVO",
-                      "renewal_bogota_nb2_ar1_gamma.stan")
 AR1_STAN <- file.path(STAN, "renewal_bogota_nb2_ar1_gamma.stan")
-if (!file.exists(AR1_STAN)) file.copy(AR1_ORIG, AR1_STAN)
 RW_STAN  <- file.path(STAN, "renewal_bogota_nb2_rw_gamma.stan")
 
 # --- Datos -------------------------------------------------------------------
-DATOS  <- file.path(STAN_ROOT, "MODELO_STAN_4", "datos_agregados.xlsx")
+DATOS  <- here("data", "datos_agregados.xlsx")
 df_raw <- as.data.frame(read_excel(DATOS, sheet = "NO_IMPORTADOS"))
 names(df_raw) <- c("fecha", "casos")
 df_raw <- df_raw[!grepl("nan", as.character(df_raw$fecha), ignore.case = TRUE), ]
@@ -93,7 +86,7 @@ datos_stan <- list(T = T_PERIODO, n_exogeno = N_EXOGENO, max_si = MAX_SI,
 # Configuracion IDENTICA a la del documento, salvo adapt_delta
 N_CHAINS <- 4L; N_WARMUP <- 1500L; N_SAMPLING <- 1500L; MAX_TREEDEPTH <- 12L
 
-cat("=== PASO 0 OK ===\n")
+cat("=== CONFIGURACION VERIFICADA ===\n")
 cat(sprintf("  R %s | CmdStan %s\n", getRversion(), cmdstan_version()))
 cat(sprintf("  Datos: %d dias, %s casos\n", length(y_obs),
             format(sum(y_obs), big.mark = ",")))
@@ -105,12 +98,11 @@ cat(sprintf("  Stan RW   : %s\n", file.exists(RW_STAN)))
 # =============================================================================
 #  CORRIDA 1 - AR(1) CON adapt_delta = 0.99
 #
-#  Linea base a superar (lo que reporta el documento, adapt_delta = 0.95):
-#      120 divergencias de 6000 (2.0%)   rhat 1.0036   ESS 1718
+#  Referencia de comparacion, corrida con adapt_delta = 0.95:
+#      120 divergencias de 6000 (2.0 %), rhat 1.0036, ESS 1718
 #
-#  Tiempo estimado: 35-50 min. Con adapt_delta mas alto el paso es menor,
-#  las trayectorias mas largas, y cada iteracion cuesta mas.
-#  Dejalo corriendo y vete a hacer otra cosa.
+#  Un adapt_delta mayor reduce el tamano de paso del integrador y alarga las
+#  trayectorias, de modo que el ajuste requiere entre 35 y 50 minutos.
 # =============================================================================
 
 cat("\n=== CORRIDA 1: AR(1) con adapt_delta = 0.99 ===\n")

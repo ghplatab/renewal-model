@@ -22,21 +22,28 @@
 # SECCIÓN 1: CONFIGURACIÓN
 # ==============================================================================
 
-# Rtools (solo Windows — ajustar versión si es necesario)
+# En Windows, cmdstanr requiere el toolchain de Rtools en el PATH. El bloque
+# localiza la instalación disponible; si Rtools ya está configurado en el
+# sistema, no tiene efecto. En otros sistemas operativos no se ejecuta.
 if (.Platform$OS.type == "windows") {
-  rtools_path <- "C:/rtools44/usr/bin;C:/rtools44/mingw64/bin"
-  Sys.setenv(PATH = paste(rtools_path, Sys.getenv("PATH"), sep = ";"))
+  rtools_dir <- Sys.getenv("RTOOLS44_HOME", unset = "")
+  if (!nzchar(rtools_dir)) {
+    candidatos <- Sys.glob("C:/rtools*")
+    if (length(candidatos) > 0) rtools_dir <- candidatos[length(candidatos)]
+  }
+  if (nzchar(rtools_dir) && dir.exists(rtools_dir)) {
+    rtools_bin <- file.path(rtools_dir, c("usr/bin", "mingw64/bin"))
+    Sys.setenv(PATH = paste(c(rtools_bin, Sys.getenv("PATH")), collapse = ";"))
+  }
 }
 
 # --- Rutas relativas a la raíz del repositorio ---
 library(here)
-RUTA_DATOS  <- here("MODELO_STAN_4", "datos_agregados.xlsx")
-RUTA_STAN   <- here("MODELO_STAN_4", "EXOGENO_GAMMA_ANALISIS_PRELIMINAR")
-RUTA_OUTPUT <- RUTA_STAN   # mismo directorio
+RUTA_DATOS  <- here("data", "datos_agregados.xlsx")
+RUTA_STAN   <- here("stan")
+RUTA_OUTPUT <- here("resultados", "fase1_exploratoria")
 
-# Creamos carpeta de output (si no existe)
 if (!dir.exists(RUTA_OUTPUT)) dir.create(RUTA_OUTPUT, recursive = TRUE)
-setwd(RUTA_OUTPUT)
 
 # --- Control de ejecución ---
 TEST_RUN      <- FALSE   # TRUE = prueba rápida (2 cadenas, 500 iter, solo IS ref)

@@ -27,16 +27,14 @@
 suppressPackageStartupMessages({
   library(cmdstanr); library(posterior); library(readxl)
   library(dplyr); library(ggplot2); library(scales)
-  library(gridExtra); library(grid)
+  library(gridExtra); library(grid); library(here)
 })
 
-BASE <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                  "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-SEP   <- file.path(BASE, "AJUSTES_SEP_2026")
-OUT   <- file.path(SEP, "resultados", "fase2_chinagamma")
-FIG   <- file.path(SEP, "figuras", "fase2_chinagamma")
-DATOS <- file.path(BASE, "Documentos George", "MODELO_STAN",
-                   "MODELO_STAN_4", "datos_agregados.xlsx")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OUT   <- here("resultados", "fase2_chinagamma")
+FIG   <- here("figuras",    "fase2_chinagamma")
+DATOS <- here("data", "datos_agregados.xlsx")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
 col_azul <- "#2166ac"; col_rojo <- "#d6604d"; col_gris <- "grey50"
 tema_tesis <- theme_minimal(base_size = 11) +
@@ -201,7 +199,7 @@ ok2 <- tryCatch({ ggsave(file.path(FIG, "fig_exogeno_cg.pdf"), fig2,
                 error = function(e) FALSE)
 cat(sprintf("  Guardada: fig_exogeno_cg.png%s\n", if (ok2) " y .pdf" else ""))
 
-cat("\n=== SCRIPT 08 COMPLETO ===\n")
+cat("\n=== FIGURAS DEL MODELO DEFINITIVO COMPLETAS ===\n")
 
 # =============================================================================
 #  FIGURAS 3 y 4 - VERSIONES EN PDF DE LAS QUE SOLO ESTABAN EN PNG

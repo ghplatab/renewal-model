@@ -19,24 +19,22 @@
 
 
 # =============================================================================
-#  PASO 0 - CONFIGURACION Y CARGA
+#  CONFIGURACION Y CARGA DE DATOS
 # =============================================================================
 
 suppressPackageStartupMessages({
   library(cmdstanr); library(posterior); library(loo)
   library(readxl); library(dplyr); library(ggplot2)
-  library(scales); library(gridExtra); library(grid)
+  library(scales); library(gridExtra); library(grid); library(here)
 })
 
-BASE <- file.path(Sys.getenv("USERPROFILE"), "OneDrive", "Escritorio",
-                  "Tesis Maestría", "AJUSTES_2026", "AJUSTES_PROFE_JCS")
-SEP  <- file.path(BASE, "AJUSTES_SEP_2026")
-OUT  <- file.path(SEP, "resultados")
-FIG  <- file.path(SEP, "figuras")
-DATOS <- file.path(BASE, "Documentos George", "MODELO_STAN",
-                   "MODELO_STAN_4", "datos_agregados.xlsx")
+# --- Rutas relativas a la raíz del repositorio -------------------------------
+OUT   <- here("resultados")
+FIG   <- here("figuras")
+DATOS <- here("data", "datos_agregados.xlsx")
+for (p in c(OUT, FIG)) dir.create(p, showWarnings = FALSE, recursive = TRUE)
 
-# --- Datos observados (identico a los scripts anteriores) --------------------
+# --- Datos observados --------------------------------------------------------
 df_raw <- as.data.frame(read_excel(DATOS, sheet = "NO_IMPORTADOS"))
 names(df_raw) <- c("fecha", "casos")
 df_raw <- df_raw[!grepl("nan", as.character(df_raw$fecha), ignore.case = TRUE), ]
@@ -278,13 +276,15 @@ cat(sprintf("  Guardada: fig_ppc_corregido.png%s\n",
 
 
 # =============================================================================
-#  PASO 7 - TABLA COMPARATIVA: CIFRA VIEJA vs CIFRA NUEVA
+#  COMPARACION ENTRE LAS DOS CONFIGURACIONES DEL MUESTREADOR
 #
-#  Las cifras "viejas" son las que calculamos sobre los draws originales
-#  (adapt_delta = 0.95) y que ya aparecen en los bloques de texto redactados.
+#  Contrasta cada cantidad derivada entre la corrida con adapt_delta = 0.95 y
+#  la corrida con adapt_delta = 0.99. Ambas estiman la misma posterior, de
+#  modo que las diferencias deben ser atribuibles a error de Monte Carlo; una
+#  discrepancia apreciable indicaria exploracion insuficiente en la primera.
 # =============================================================================
 
-cat("\n=== PASO 7: QUE CIFRAS CAMBIAN EN EL TEXTO ===\n")
+cat("\n=== COMPARACION ENTRE CONFIGURACIONES DEL MUESTREADOR ===\n")
 
 viejo <- list(
   cob50 = 72.2, cob80 = 88.3, cob95 = 95.0,

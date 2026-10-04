@@ -19,8 +19,9 @@ grid$estacionario <- with(grid,
 
 grid$D <- with(grid, calcular_D(rho1, rho2))
 
-# Cargar draws posteriores (modelo AR2+Gamma referencia del análisis preliminar)
-fit_ref <- readRDS(here("MODELO_STAN_4", "EXOGENO_GAMMA_ANALISIS_PRELIMINAR",
+# Draws posteriores del AR(2) + Gamma con intervalo serial de referencia,
+# ajustado en el análisis preliminar
+fit_ref <- readRDS(here("resultados", "fase1_exploratoria",
                         "fit_gamma_referencia_NB2.rds"))
 draws <- fit_ref$draws(c("rho1", "rho2"), format = "df")
 draws_sample <- draws[sample(nrow(draws), 1000), ]
@@ -65,7 +66,10 @@ p <- ggplot() +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank())
 
-ggsave("Figuras/region_estacionariedad_ar2.pdf", p, 
+RUTA_OUTPUT <- here("resultados", "fase1_exploratoria")
+if (!dir.exists(RUTA_OUTPUT)) dir.create(RUTA_OUTPUT, recursive = TRUE)
+
+ggsave(file.path(RUTA_OUTPUT, "region_estacionariedad_ar2.pdf"), p,
        width = 8, height = 7)
 
 
