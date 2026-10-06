@@ -21,9 +21,17 @@
 # ---------------------------------------------------------------------------
 # Fits MCMC (.rds) — archivos grandes, se regeneran corriendo los scripts
 # Excepciones: si quieres versionar fits livianos, quita el # de la línea
+#
+# fit_*.rds / draws_*.rds: nomenclatura de R/fase1_exploratoria
+# corrida*.rds / f2cg_*.rds / def_*.rds / final_*.rds: nomenclatura de
+# R/fase2_definitiva (antes no estaban cubiertos por este archivo)
 # ---------------------------------------------------------------------------
 fit_*.rds
 draws_*.rds
+corrida*.rds
+f2cg_*.rds
+def_*.rds
+final_*.rds
 
 # ---------------------------------------------------------------------------
 # Figuras generadas (outputs reproducibles)

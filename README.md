@@ -191,15 +191,26 @@ Stan como vector fijo `g[max_si]`.
 
 ## Requisitos de software
 
+`cmdstanr` no está en CRAN: se instala desde el repositorio de Stan en
+r-universe. Instalarlo con el `install.packages()` genérico de abajo falla
+con "package 'cmdstanr' is not available".
+
 ```r
 # R >= 4.2
+
+# cmdstanr se instala aparte, desde el repositorio de Stan
+install.packages("cmdstanr", repos = c("https://stan-dev.r-universe.dev",
+                                        "https://cloud.r-project.org"))
+
 install.packages(c(
-  "cmdstanr", "posterior", "bayesplot", "loo",
+  "posterior", "bayesplot", "loo",
   "readxl", "dplyr", "tidyr", "ggplot2",
-  "patchwork", "lubridate", "gridExtra", "scales"
+  "patchwork", "lubridate", "gridExtra", "scales", "here"
 ))
 
-cmdstanr::install_cmdstan()
+# La carpeta destino debe existir antes de instalar
+dir.create("C:/cmdstan", showWarnings = FALSE)
+cmdstanr::install_cmdstan(dir = "C:/cmdstan", version = "2.39.0")
 ```
 
 **Versiones usadas en el análisis original:**
@@ -210,6 +221,16 @@ cmdstanr::install_cmdstan()
 | Definitiva | 2.39.0 | 0.9.0 |
 
 Sistema: Windows 11, R 4.2.2 con Rtools correspondiente.
+
+> **Rutas fijas en Windows.** Los scripts de `R/fase2_definitiva/` esperan
+> CmdStan en `C:/cmdstan/cmdstan-2.39.0` (o la ruta que indique la variable
+> de entorno `CMDSTAN`), y usan `C:/stan_build` y `C:/stan_out` como
+> carpetas de compilación y de salida cruda de CmdStan, fuera del
+> repositorio. Esto es intencional: CmdStan corrompe sus CSV de salida en
+> rutas con tildes o caracteres no ASCII bajo Windows. En otro sistema
+> operativo, o si CmdStan queda instalado en otra ruta, hay que ajustar
+> `CMDSTAN_DIR`, `BUILD` y `CSVOUT` al inicio de cada script antes de
+> correrlo.
 
 ---
 
